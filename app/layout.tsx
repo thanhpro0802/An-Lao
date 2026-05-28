@@ -1,11 +1,6 @@
 import type {Metadata} from 'next';
-import { Lexend } from 'next/font/google';
 import './globals.css'; // Global styles
-
-const lexend = Lexend({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-lexend',
-});
+import { AuthProvider } from '@/hooks/useAuth';
 
 export const metadata: Metadata = {
   title: 'An Lão - Elder Care',
@@ -14,9 +9,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="vi" className={lexend.variable}>
+    <html lang="vi">
       <body className="font-lexend bg-surface text-[#111c2c] antialiased" suppressHydrationWarning>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

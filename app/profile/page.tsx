@@ -1,12 +1,60 @@
+"use client";
+
 import { 
   Menu, Settings, Edit2, BadgeCheck, Plus, MoreVertical, 
   CalendarDays, Star, Bookmark, Bell, ChevronRight, 
   Headset, HelpCircle, BookOpen, FileText, LogOut 
 } from "lucide-react";
 import Link from "next/link";
-import BottomNav from "@/components/BottomNav";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import Navigation from "@/components/Navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { CldUploadWidget } from "next-cloudinary";
+import { fetchApi } from "@/lib/api";
+import Image from "next/image";
 
 export default function ProfilePage() {
+  const { user, isLoading, logout } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login?redirect=/profile");
+    }
+  }, [user, isLoading, router]);
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-surface flex justify-center items-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const getInitials = (name: string) => {
+    if (!name) return "U";
+    const parts = name.split(" ");
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  };
+
+  const handleUploadSuccess = async (result: any) => {
+    if (result.info && result.info.secure_url) {
+      const newAvatarUrl = result.info.secure_url;
+      try {
+        await fetchApi("/auth/profile", {
+          method: "PUT",
+          body: JSON.stringify({ avatarUrl: newAvatarUrl })
+        });
+        // Reload to get fresh user data
+        window.location.reload();
+      } catch (err) {
+        console.error("Failed to update profile", err);
+      }
+    }
+  };
+
   return (
     <div className="bg-surface text-on-surface pb-[100px] min-h-screen">
       <header className="bg-white flex items-center justify-between px-4 h-16 w-full sticky top-0 z-50 border-b border-outline-variant max-w-5xl mx-auto">
@@ -23,86 +71,70 @@ export default function ProfilePage() {
 
       <main className="max-w-container-max mx-auto px-4 md:px-gutter pt-margin pb-section-gap space-y-section-gap">
         <section className="grid grid-cols-1 md:grid-cols-12 gap-gutter">
-          <div className="md:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-xl p-[32px] relative">
+          <div className="md:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-lg p-[32px] relative">
             <button aria-label="Edit Profile" className="absolute top-[24px] right-[24px] p-2 text-outline hover:text-primary transition-colors">
               <Edit2 className="w-5 h-5" />
             </button>
             <div className="flex flex-col md:flex-row items-center md:items-start gap-gutter">
-              <div className="w-[88px] h-[88px] rounded-full bg-primary flex items-center justify-center shrink-0">
-                <span className="font-headline-md text-headline-md text-on-primary font-bold">NVA</span>
-              </div>
+              <CldUploadWidget 
+                signatureEndpoint="/api/cloudinary/sign"
+                onSuccess={handleUploadSuccess}
+                options={{
+                  multiple: false,
+                  maxFiles: 1,
+                  resourceType: "image",
+                  clientAllowedFormats: ["jpg", "jpeg", "png", "webp"],
+                  maxImageFileSize: 5000000 // 5MB
+                }}
+              >
+                {({ open }) => (
+                  <div 
+                    onClick={() => open()}
+                    className="w-[88px] h-[88px] rounded-full bg-primary flex items-center justify-center shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative overflow-hidden group"
+                  >
+                    {user.avatarUrl ? (
+                      <Image src={user.avatarUrl} alt="Avatar" fill className="object-cover" />
+                    ) : (
+                      <span className="font-headline-md text-headline-md text-white font-bold">{getInitials(user.fullName)}</span>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 hidden group-hover:flex items-center justify-center">
+                      <Edit2 className="w-6 h-6 text-white" />
+                    </div>
+                  </div>
+                )}
+              </CldUploadWidget>
               <div className="text-center md:text-left space-y-base flex-1">
-                <h2 className="font-headline-lg text-headline-lg text-on-surface font-bold">Nguyễn Văn A</h2>
-                <p className="font-body-lg text-body-lg text-on-surface-variant">0912 345 xxx</p>
-                <div className="inline-flex items-center gap-2 bg-primary-container text-on-primary-container px-4 py-2 rounded-full mt-2">
+                <h2 className="font-headline-lg text-headline-lg text-on-surface font-bold">{user.fullName || "Người dùng ẩn danh"}</h2>
+                <p className="font-body-lg text-body-lg text-on-surface-variant">{user.phone || user.email}</p>
+                <div className="inline-flex items-center gap-2 bg-primary-container text-primary px-4 py-2 rounded-full mt-2">
                   <BadgeCheck className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                  <span className="font-label-lg text-label-lg uppercase text-[14px]">Thành viên An Lão</span>
+                  <span className="font-label-lg text-label-lg uppercase text-[14px]">
+                    {user.role === 'ADMIN' ? 'Quản trị viên An Lão' : 'Thành viên An Lão'}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
           
           <div className="md:col-span-4 grid grid-cols-3 md:grid-cols-1 md:grid-rows-3 gap-base">
-            <div className="bg-surface-container-high rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div className="bg-surface-container-high rounded-lg p-4 flex flex-col items-center justify-center text-center">
               <span className="font-headline-md text-headline-md text-primary font-bold">2</span>
               <span className="font-label-lg text-label-lg text-on-surface-variant text-[14px]">Lịch hẹn</span>
             </div>
-            <div className="bg-surface-container-high rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div className="bg-surface-container-high rounded-lg p-4 flex flex-col items-center justify-center text-center">
               <span className="font-headline-md text-headline-md text-primary font-bold">1</span>
               <span className="font-label-lg text-label-lg text-on-surface-variant text-[14px]">Đánh giá</span>
             </div>
-            <div className="bg-surface-container-high rounded-xl p-4 flex flex-col items-center justify-center text-center">
+            <div className="bg-surface-container-high rounded-lg p-4 flex flex-col items-center justify-center text-center">
               <span className="font-headline-md text-headline-md text-primary font-bold">3</span>
               <span className="font-label-lg text-label-lg text-on-surface-variant text-[14px]">Đã lưu</span>
             </div>
           </div>
         </section>
 
-        <section className="space-y-gutter">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-headline-md text-headline-md text-on-surface font-bold">Hồ sơ người thân</h3>
-              <p className="font-body-md text-body-md text-outline mt-1 text-[14px]">Hồ sơ giúp An Lão gợi ý cơ sở phù hợp hơn</p>
-            </div>
-            <button aria-label="Thêm hồ sơ" className="w-[48px] h-[48px] bg-primary text-on-primary rounded-full flex items-center justify-center hover:bg-surface-tint transition-colors">
-              <Plus className="w-6 h-6" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-gutter">
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-[32px] flex flex-col hover:border-primary transition-colors cursor-pointer group">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors font-bold">Mẹ — Nguyễn Thị B</h4>
-                  <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">72 tuổi</p>
-                </div>
-                <MoreVertical className="w-6 h-6 text-outline" />
-              </div>
-              <div className="flex flex-wrap gap-2 mt-auto pt-4">
-                <span className="bg-surface-container-low text-on-surface px-3 py-1 rounded-full font-label-lg text-label-lg text-[14px]">Huyết áp cao</span>
-                <span className="bg-surface-container-low text-on-surface px-3 py-1 rounded-full font-label-lg text-label-lg text-[14px]">Tiểu đường</span>
-                <span className="bg-surface-container-low text-on-surface px-3 py-1 rounded-full font-label-lg text-label-lg text-[14px]">Tự đi lại được</span>
-              </div>
-            </div>
-            
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-[32px] flex flex-col hover:border-primary transition-colors cursor-pointer group">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h4 className="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors font-bold">Bà — Trần Thị C</h4>
-                  <p className="font-body-lg text-body-lg text-on-surface-variant mt-1">85 tuổi</p>
-                </div>
-                <MoreVertical className="w-6 h-6 text-outline" />
-              </div>
-              <div className="flex flex-wrap gap-2 mt-auto pt-4">
-                <span className="bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-lg text-label-lg text-[14px]">Sau tai biến</span>
-                <span className="bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-lg text-label-lg text-[14px]">Nằm liệt giường</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section className="space-y-margin">
           <h3 className="font-headline-md text-headline-md text-on-surface font-bold">Hoạt động của tôi</h3>
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden divide-y divide-outline-variant">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant">
             <Link href="/appointments" className="flex items-center justify-between p-4 md:px-6 hover:bg-surface-container-low transition-colors min-h-[56px]">
               <div className="flex items-center gap-4">
                 <CalendarDays className="w-6 h-6 text-primary" />
@@ -133,22 +165,12 @@ export default function ProfilePage() {
                 <ChevronRight className="w-6 h-6 text-outline" />
               </div>
             </Link>
-            <div className="flex items-center justify-between p-4 md:px-6 min-h-[56px]">
-              <div className="flex items-center gap-4">
-                <Bell className="w-6 h-6 text-primary" />
-                <span className="font-body-lg text-body-lg text-on-surface">Thông báo</span>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input defaultChecked className="sr-only peer" type="checkbox" />
-                <div className="w-11 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-              </label>
-            </div>
           </div>
         </section>
 
         <section className="space-y-margin">
           <h3 className="font-headline-md text-headline-md text-on-surface font-bold">Hỗ trợ</h3>
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden divide-y divide-outline-variant">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant">
             <Link href="#" className="flex items-center justify-between p-4 md:px-6 hover:bg-surface-container-low transition-colors min-h-[56px]">
               <div className="flex items-center gap-4">
                 <Headset className="w-6 h-6 text-primary" />
@@ -163,19 +185,12 @@ export default function ProfilePage() {
               </div>
               <ChevronRight className="w-6 h-6 text-outline" />
             </Link>
-            <Link href="#" className="flex items-center justify-between p-4 md:px-6 hover:bg-surface-container-low transition-colors min-h-[56px]">
-              <div className="flex items-center gap-4">
-                <BookOpen className="w-6 h-6 text-primary" />
-                <span className="font-body-lg text-body-lg text-on-surface">Hướng dẫn chọn viện dưỡng lão</span>
-              </div>
-              <ChevronRight className="w-6 h-6 text-outline" />
-            </Link>
           </div>
         </section>
 
         <section className="space-y-margin">
           <h3 className="font-headline-md text-headline-md text-on-surface font-bold">Tài khoản</h3>
-          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden divide-y divide-outline-variant">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden divide-y divide-outline-variant">
             <Link href="#" className="flex items-center justify-between p-4 md:px-6 hover:bg-surface-container-low transition-colors min-h-[56px]">
               <div className="flex items-center gap-4">
                 <FileText className="w-6 h-6 text-outline" />
@@ -183,17 +198,20 @@ export default function ProfilePage() {
               </div>
               <ChevronRight className="w-6 h-6 text-outline" />
             </Link>
-            <Link href="#" className="flex items-center justify-between p-4 md:px-6 hover:bg-error-container transition-colors min-h-[56px] group">
+            <button 
+              onClick={logout} 
+              className="w-full flex items-center justify-between p-4 md:px-6 hover:bg-error-container transition-colors min-h-[56px] group"
+            >
               <div className="flex items-center gap-4">
-                <LogOut className="w-6 h-6 text-error group-hover:text-on-error-container" />
-                <span className="font-body-lg text-body-lg text-error group-hover:text-on-error-container font-medium">Đăng xuất</span>
+                <LogOut className="w-6 h-6 text-error" />
+                <span className="font-body-lg text-body-lg text-error font-medium">Đăng xuất</span>
               </div>
-            </Link>
+            </button>
           </div>
         </section>
       </main>
 
-      <BottomNav />
+      <Navigation />
     </div>
   );
 }
