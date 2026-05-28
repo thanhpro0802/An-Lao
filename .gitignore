@@ -1,7 +1,7 @@
-node_modules/
-.next/
-coverage/
-.DS_Store
+# Root-level ignores for IDEs and system files
+.idea/
+.vscode/
+.qodo/
 *.log
-.env*
-!.env.example
+.DS_Store
+Thumbs.db

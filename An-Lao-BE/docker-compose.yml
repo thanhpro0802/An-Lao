@@ -1,0 +1,17 @@
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: anlao-postgres
+    environment:
+      POSTGRES_DB: anlaodb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "080205"
+    ports:
+      - "5433:5432"
+    volumes:
+      - anlao-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  anlao-db-data:
