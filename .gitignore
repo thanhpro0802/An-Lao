@@ -4,4 +4,6 @@
 .qodo/
 *.log
 .DS_Store
+node_modules/
+package-lock.json
 Thumbs.db

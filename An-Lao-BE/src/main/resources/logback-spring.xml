@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Thư mục chứa log -->
+    <property name="LOG_PATH" value="logs" />
+    <property name="LOG_FILE" value="anlao-api" />
+
+    <!-- 1. Console Appender (Dành cho Local Dev, dễ đọc) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <charset>utf8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 2. JSON File Appender (Dành cho Prod/Cloud, tối ưu cho ELK) -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/${LOG_FILE}-json.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Xoay vòng file mỗi ngày -->
+            <fileNamePattern>${LOG_PATH}/archived/${LOG_FILE}-json.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- Giữ tối đa 7 ngày log -->
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Bổ sung các custom field nếu cần -->
+            <customFields>{"app_name":"anlao-backend"}</customFields>
+        </encoder>
+    </appender>
+
+    <!-- Cấu hình các profile khác nhau -->
+    
+    <!-- Profile: dev (Mặc định chạy ở local - Chỉ ghi Console) -->
+    <springProfile name="dev | default">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>
+        <logger name="com.anlao.anlao_api" level="DEBUG" />
+    </springProfile>
+
+    <!-- Profile: prod | cloud (Môi trường deploy - Ghi cả Console và File JSON) -->
+    <springProfile name="prod | cloud">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+            <appender-ref ref="JSON_FILE" />
+        </root>
+        <logger name="com.anlao.anlao_api" level="INFO" />
+    </springProfile>
+</configuration>

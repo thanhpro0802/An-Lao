@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # 1. Database PostgreSQL tích hợp sẵn pgvector
+  db:
+    image: ankane/pgvector:v0.5.1
+    container_name: anlao_db
+    environment:
+      POSTGRES_DB: anlaodb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "080205"
+    ports:
+      - "5433:5432" # Ánh xạ cổng 5433 của host sang 5432 của container
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - anlao_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d anlaodb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Backend Service (Spring Boot 3 + Java 21)
+  backend:
+    build:
+      context: ./An-Lao-BE
+      dockerfile: Dockerfile
+    container_name: anlao_backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod # Kích hoạt xuất log JSON ra file
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/anlaodb
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=080205
+      - GEMINI_API_KEY=AIzaSyCbrfFpwH6K7wJzRB6BTKlDmC8Yqb5c2qU
+    volumes:
+      - be_logs:/app/logs # Share volume logs với Logstash
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - anlao_network
+
+  # 3. Frontend Service (Next.js 15 Standalone)
+  frontend:
+    build:
+      context: ./An-Lao-FE
+      dockerfile: Dockerfile
+    container_name: anlao_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080 # Gọi từ Browser client
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - anlao_network
+
+  # 4. Elasticsearch (SIEM Database)
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    container_name: anlao_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false # Tắt bảo mật để làm lab demo nhanh
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g" # Giới hạn bộ nhớ JVM tránh tràn RAM (OOM)
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - anlao_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|yellow'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # 5. Logstash (Log Aggregator)
+  logstash:
+    image: logstash:8.12.0
+    container_name: anlao_logstash
+    environment:
+      - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
+    volumes:
+      - ./elk/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - be_logs:/usr/share/logstash/logs:ro # Đọc log từ volume chia sẻ với backend
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      backend:
+        # Đợi backend khởi động và tạo thư mục logs
+        condition: service_started
+    networks:
+      - anlao_network
+
+  # 6. Kibana (SIEM Visualization Dashboard)
+  kibana:
+    image: kibana:8.12.0
+    container_name: anlao_kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - anlao_network
+
+volumes:
+  postgres_data:
+    driver: local
+  es_data:
+    driver: local
+  be_logs:
+    driver: local
+
+networks:
+  anlao_network:
+    driver: bridge
