@@ -34,7 +34,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/anlaodb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=080205
-      - GEMINI_API_KEY=AIzaSyCbrfFpwH6K7wJzRB6BTKlDmC8Yqb5c2qU
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     volumes:
       - be_logs:/app/logs # Share volume logs với Logstash
     depends_on:
