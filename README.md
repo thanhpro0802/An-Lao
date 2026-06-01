@@ -1,179 +1,190 @@
+# 🏥 AnLao.vn — AI-Powered Nursing Home Booking & Search Platform
+
+AnLao.vn is a comprehensive, production-ready monorepo combining a modern Next.js 15 frontend, a robust Spring Boot 3 API backend, and an intelligent Retrieval-Augmented Generation (RAG) AI consulting engine. 
+
+Designed for high reliability and security, it includes a centralized logging system (ELK Stack) for SIEM monitoring and fully automated Infrastructure as Code (IaC) configuration using Terraform for secure deployment on AWS.
+
+---
+
 <div align="center">
-
-# 🏥 AnLao.vn — Nền Tảng Đặt Lịch Viện Dưỡng Lão & Tư Vấn AI
-
-**Hệ thống tìm kiếm, so sánh và đặt lịch hẹn thông minh kết hợp trợ lý ảo AI (RAG) tư vấn viện dưỡng lão tại Việt Nam.**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.x-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Gemini](https://img.shields.io/badge/Google_Gemini-8E75C2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.0-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white)](https://www.terraform.io/)
+[![ELK Stack](https://img.shields.io/badge/ELK_Stack-8.x-005571?style=for-the-badge&logo=elastic&logoColor=white)](https://www.elastic.co/)
 
 </div>
 
 ---
 
-## 📌 Giới thiệu dự án
+## 📐 System Architecture
 
-**AnLao.vn** là một nền tảng Monorepo tích hợp toàn diện gồm ứng dụng Frontend tương tác hiện đại và dịch vụ API Backend mạnh mẽ hỗ trợ tìm kiếm, so sánh chi tiết và đặt lịch tham quan tại 14 cơ sở dưỡng lão uy tín. Dự án nổi bật với module **Trợ lý AI tư vấn** ứng dụng công nghệ **RAG (Retrieval-Augmented Generation)** để giải đáp thắc mắc của khách hàng dựa trên dữ liệu thực tế được cập nhật thường xuyên.
+The project adopts a modern **Three-Tier Secure Architecture** separated by subnets inside an AWS VPC.
 
-### 📐 Kiến trúc hệ thống
-```text
-             [ Trình duyệt / Client ]
-                      │ (Next.js 15 App)
-                      ▼
-               [ API Gateway / CORS ]
-                      │ (Spring Security JWT)
-                      ▼
-             [ Spring Boot Services ] ◄───► [ Gemini API ] (gemini-2.5-flash)
-                      │
-           ┌──────────┴──────────┐
-           ▼                     ▼
-    [ PostgreSQL ] ◄───────► [ pgvector ]
-  (Dữ liệu quan hệ)       (Tìm kiếm ngữ nghĩa 768-dim)
+```mermaid
+graph TD
+    User([Browser Client]) -->|HTTPS / Port 80/443| FE_EC2[EC2 Frontend - Public Subnet]
+    
+    subgraph VPC [AWS Virtual Private Cloud]
+        subgraph Public_Subnet [Public Subnet]
+            FE_EC2 -->|Nginx Reverse Proxy / Next.js| FE_Container[Next.js App Container]
+        end
+        
+        subgraph Private_Subnet [Private Subnet - Isolated]
+            FE_Container -->|Internal API Calls| BE_Container[Spring Boot API Container]
+            BE_Container -->|RAG / Semantic Vector Search| DB[(PostgreSQL + pgvector)]
+            
+            subgraph ELK_SIEM [Centralized Logging & SIEM]
+                BE_Container -->|Writes JSON Logs| Shared_Volume[(Docker Volume)]
+                Shared_Volume -->|Reads Logs| Logstash[Logstash Container]
+                Logstash -->|Index Tags: security_alert| ES[(Elasticsearch SIEM DB)]
+                ES -->|Visualize / Discover| Kibana[Kibana Dashboard]
+            end
+        end
+    end
 ```
 
 ---
 
-## ✨ Các tính năng cốt lõi
+## ✨ Core Features
 
-### 1. Phân hệ Khách hàng (Frontend Portal)
-* **Tìm kiếm & Bộ lọc nâng cao:** Lọc cơ sở dưỡng lão theo Quận/Huyện, mức giá (min/max), loại hình chăm sóc (nội trú, bán trú, tại gia) và các dịch vụ đi kèm.
-* **Đặt lịch hẹn trực tuyến:** Chọn ngày giờ, điền thông tin và đặt lịch tham quan/tư vấn tại cơ sở mong muốn.
-* **Đánh giá & Phản hồi:** Nơi gia đình để lại bình luận và thang điểm đánh giá chất lượng thực tế.
-* **Tư vấn AI (Chatbot RAG):** Chatbot thông minh tự động trích xuất thông tin các cơ sở dưỡng lão phù hợp dựa trên vị trí, khoảng giá hoặc nhu cầu chăm sóc cụ thể.
+### 1. User & Admin Portal (Next.js 15)
+* **Semantic & Filtered Search:** Dynamic client-side SPA filtering with Debounce logic for real-time facility search by pricing, district, care type, and tags without page reloads.
+* **Lazy Registration UX:** Allows users to select schedules and book visits using only basic contact info (name and phone). The system automatically registers their account in the background and issues a secure JWT token, dramatically reducing booking abandonment.
+* **Admin CMS Dashboard:** Full CRUD management of elderly care facilities (add facilities, upload images, manage prices, and configure amenities tags).
 
-### 2. Phân hệ Quản trị (Admin CMS)
-* **Quản lý Cơ sở (Facilities CRUD):** Thêm mới, chỉnh sửa thông tin chi tiết (địa chỉ, mức giá, bao gồm/loại trừ, tags tiện ích).
-* **Độ tin cậy & Cảnh báo:** Hệ thống cảnh báo tự động về chất lượng (ví dụ: các cơ sở có nguy cơ seeding đánh giá hoặc vệ sinh kém).
+### 2. AI RAG (Retrieval-Augmented Generation) Chatbot
+* Toggles semantic search over the facility database by combining PostgreSQL's **pgvector** and Google's **Gemini API** (`gemini-2.5-flash` model and `text-embedding-004`).
+* Employs cosine similarity mapping (`<=> < 0.45` threshold) to matches user queries with parsed chunks of facility descriptions.
+* Fully automated database vector seeder (`VectorSeeder`) that updates missing embeddings on startup using Gemini.
 
-### 3. Động cơ RAG (Retrieval-Augmented Generation)
-* Tích hợp **pgvector** trong PostgreSQL để tính toán độ tương đồng giữa câu hỏi của người dùng và văn bản mô tả cơ sở bằng khoảng cách Cosine (`<=>`).
-* Sử dụng mô hình **`gemini-embedding-001`** (giới hạn `768` chiều) kết hợp thế hệ ngôn ngữ lớn **`gemini-2.5-flash`** của Google để trả về câu trả lời tự nhiên, đáng tin cậy.
+### 3. DevSecOps & Centralized Logging (ELK Stack)
+* **JSON Log Rotation:** Spring Boot utilizes Logback encoder to pipe structured logs (`anlao-api-json.log`) to a shared Docker volume.
+* **Security Auditing:** Authentication failures and access control violations are intercepted by `GlobalExceptionHandler` and tagged with `[SECURITY_AUDIT]` detailing the Client IP and Browser User-Agent.
+* **Real-time SIEM Pipeline:** Logstash automatically tails log volumes, applies security filters, attaches a `security_alert` tag, and daily indexes them into Elasticsearch. Kibana Discover is configured for real-time threat threat intelligence.
+
+### 4. Infrastructure as Code (Terraform)
+* **VPC Isolation:** Provisions public subnets for public-facing servers (Nginx proxy) and isolated private subnets for application servers (backend API, database, and logs).
+* **AWS SSM Session Manager:** Restricts EC2 SSH port (22) from being exposed to the Internet. Maintenance and command execution are routed securely via AWS SSM agent.
+* **AWS Budgeting Alerts:** Protects cloud billing by configuring budget triggers that email warnings when costs exceed threshold limits ($4/month forecast or $5/month actuals).
 
 ---
 
-## 📂 Cấu trúc thư mục Monorepo
+## 📂 Folder Structure
 
 ```text
 An-Lao/
-├── An-Lao-FE/               # NEXT.JS 15 + REACT 19 FRONTEND
-│   ├── app/                 # App Router (pages, layouts, API routes)
-│   │   ├── admin/           # Trang quản trị cơ sở
-│   │   ├── chat/            # Giao diện Trợ lý ảo AI
-│   │   ├── facility/[id]/   # Chi tiết cơ sở & Đặt lịch
-│   │   └── login/register/  # Xác thực người dùng
+├── An-Lao-FE/               # Next.js 15 Standalone Web Application
+│   ├── app/                 # App Router (pages, layouts, admin, chat, bookings)
 │   ├── components/          # Reusable UI components
-│   ├── hooks/               # Custom React hooks (useAuth, useMobile, ...)
-│   ├── lib/                 # Tiện ích bổ trợ (axios/fetch config, utils)
-│   └── package.json
+│   ├── hooks/               # Custom React hooks (useAuth, useMobile, etc.)
+│   └── Dockerfile           # Optimized multi-stage production Alpine build
 │
-├── An-Lao-BE/               # SPRING BOOT 3 BACKEND SERVICE
-│   ├── src/main/java/com/anlao/anlao_api/
-│   │   ├── component/       # VectorSeeder nạp vector tự động
-│   │   ├── config/          # Cấu hình CORS, Security, Swagger
-│   │   ├── controller/      # API Endpoints (Auth, Facility, Booking, Chat)
-│   │   ├── entity/          # JPA Entities (Facility, FacilityChunk, User, Review)
-│   │   ├── repository/      # JPA & Native pgvector queries
-│   │   └── service/         # Business Logic & Gemini API integration
+├── An-Lao-BE/               # Spring Boot 3 Backend API Service
+│   ├── src/main/java/       # Controller, Service, DTO, Entity, Security, Repository
 │   ├── src/main/resources/
-│   │   ├── db/migration/    # DDL & DML SQL scripts
-│   │   └── application-dev.yml # Cấu hình dev (kết nối DB, Gemini API key)
-│   └── pom.xml
+│   │   ├── db/migration/    # Flyway database schema & seed scripts
+│   │   └── logback-spring.xml # Plain console logs for dev / JSON logs for prod
+│   ├── Dockerfile           # Multi-stage Eclipse Temurin JRE 21 build
+│   └── pom.xml              # Maven dependencies (Maven compiler, Logstash encoder)
 │
-└── .gitignore               # File ignore ở cấp độ Monorepo gốc
+├── elk/                     # SIEM Stack configuration files
+│   └── logstash/pipeline/   # Logstash pipelines parsing JSON audit logs
+│
+├── terraform/               # Infrastructure as Code AWS files
+│   ├── provider.tf          # Provider setup (default: ap-southeast-1)
+│   ├── vpc.tf               # VPC, public/private subnets, NAT Gateway, Routing
+│   ├── security_groups.tf   # Firewalls restricting incoming traffic to internal services
+│   ├── ec2.tf               # AWS Instances provisioning & automated Docker setup
+│   ├── iam.tf               # AWS SSM Integration configurations
+│   └── budget.tf            # Billing thresholds alerts setup
+│
+├── docker-compose.yml       # Monorepo container deployment configurations
+└── .env.example             # Template for API credentials and local databases
 ```
 
 ---
 
-## ⚙️ Hướng dẫn cài đặt & Chạy ứng dụng
+## 🚀 Local Development Setup
 
-### Yêu cầu hệ thống trước khi bắt đầu:
-* **Java SDK 17+**
-* **Node.js 18+** & **npm**
-* **PostgreSQL 15+** (Đã cài đặt extension **pgvector**)
-* **Gemini API Key** (Lấy miễn phí tại [Google AI Studio](https://aistudio.google.com/))
+The fastest and most stable way to run the entire stack (FE, BE, Database, SIEM) is using **Docker Compose**.
 
----
+### Prerequisite:
+* Install **Docker Desktop** on your machine.
+* Obtain a **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/).
 
-### Bước 1: Thiết lập Cơ sở dữ liệu (PostgreSQL)
-1. Đăng nhập vào PostgreSQL và tạo một database mới:
-   ```sql
-   CREATE DATABASE anlaodb;
-   ```
-2. Cài đặt extension **pgvector**:
-   ```sql
-   \c anlaodb;
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
+### 1. Configure Environment Variables
+Create a `.env` file in the root directory:
+```env
+# Gemini API credentials
+GEMINI_API_KEY=AIzaSyYourGeminiAPIKeyHere
+```
 
----
+### 2. Startup Containers
+Run the following command at the root of the project:
+```bash
+docker compose up --build -d
+```
+Docker will automatically build frontend/backend images and start all 6 services:
+* **Frontend Web Portal:** `http://localhost:3000`
+* **Swagger API Documentation:** `http://localhost:8080/swagger-ui/index.html`
+* **Kibana SIEM Dashboard:** `http://localhost:5601`
+* **Elasticsearch Engine:** `http://localhost:9200`
+* **PostgreSQL (pgvector):** Listening on host port `5434` (mapped to `5432` in container)
 
-### Bước 2: Cấu hình và chạy Backend (`An-Lao-BE`)
-1. Di chuyển vào thư mục backend:
-   ```bash
-   cd An-Lao-BE
-   ```
-2. Cấu hình file `src/main/resources/application-dev.yml`. Cập nhật thông tin kết nối Database và điền **Gemini API Key** của bạn:
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:postgresql://localhost:5433/anlaodb # Thay đổi cổng/tên DB tương ứng
-       username: postgres
-       password: your_db_password
-
-   gemini:
-     api-key: AIzaSy... # Điền API Key của bạn tại đây
-   ```
-3. Chạy lệnh Maven để biên dịch dự án:
-   ```bash
-   .\mvnw.cmd compile
-   ```
-4. Khởi động ứng dụng Spring Boot:
-   ```bash
-   .\mvnw.cmd spring-boot:run
-   ```
-   *API Server mặc định sẽ khởi chạy tại cổng:* `http://localhost:8080`
-   *Tài liệu Swagger API có thể xem tại:* `http://localhost:8080/swagger-ui/index.html`
+### 3. Verify Logging Pipeline
+1. Access `http://localhost:3000/login`.
+2. Input a random email and invalid password, then attempt to log in **5 times**.
+3. Access Kibana at `http://localhost:5601`.
+4. Go to **Analytics** -> **Discover** -> Create a Data View matching `anlao-logs-*` with `@timestamp`.
+5. Search for `tags : "security_alert"`. You will see all 5 failed login attempts flagged with your Client IP and User Agent.
 
 ---
 
-### Bước 3: Cấu hình và chạy Frontend (`An-Lao-FE`)
-1. Di chuyển vào thư mục frontend:
-   ```bash
-   cd ../An-Lao-FE
-   ```
-2. Cài đặt các gói phụ thuộc:
-   ```bash
-   npm install
-   ```
-3. Tạo file cấu hình môi trường `.env.local` ở thư mục `An-Lao-FE`:
-   ```env
-   NEXT_PUBLIC_API_URL=http://localhost:8080
-   ```
-4. Chạy Frontend ở chế độ Development:
-   ```bash
-   npm run dev
-   ```
-   *Giao diện người dùng sẽ chạy tại địa chỉ:* `http://localhost:3000`
+## ☁️ AWS Cloud Deployment (Terraform)
+
+Deploying to AWS is fully automated. The infrastructure matches the design defined in [VPC Network Architecture](#-system-architecture).
+
+### 1. Prerequisites
+* Install **Terraform CLI** and **AWS CLI**.
+* Configure your AWS CLI credentials:
+  ```bash
+  aws configure
+  ```
+
+### 2. Launch Infrastructure
+Navigate to the `terraform/` directory:
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply
+```
+
+*Terraform will output the public IP of the Frontend EC2 instance and SSM command IDs to securely connect to private instances.*
+
+### 3. Cleaning Up (Avoid Charges)
+Once you have completed testing or showing the project to recruiters, terminate all AWS resources to avoid billing charges:
+```bash
+terraform destroy
+```
 
 ---
 
-## 🛠️ Quy tắc phát triển đóng góp (Monorepo Rules)
+## 🛠️ Monorepo Contribution Rules
 
-1. **Không hardcode thông tin nhạy cảm:** Các mã khóa API, mật khẩu Database bắt buộc phải khai báo qua biến môi trường hoặc file config được bỏ qua trong `.gitignore`.
-2. **Quy tắc TypeScript nghiêm ngặt:** Tuyệt đối không sử dụng kiểu dữ liệu `any`. Định nghĩa Interface/Type rõ ràng cho mọi request/response DTO.
-3. **Quy tắc Next.js 15:**
-    * Sử dụng App Router (`/app`).
-    * Giữ React Server Components (RSC) làm mặc định để tối ưu hóa SEO. Chỉ khai báo `"use client"` khi thực sự cần thiết (sử dụng State, Effects hoặc Event listener).
-4. **pgvector & RAG:** Khoảng cách lọc vector tìm kiếm ngữ nghĩa được cài đặt thông số Cosine Distance `<=> < 0.45` để cân bằng giữa độ bao phủ dữ liệu và tính liên quan của câu trả lời.
+1. **Security Standards:** Never commit secrets, API Keys, or credentials. Always use environment variable interpolation (`${GEMINI_API_KEY}`) and keep local parameters in the git-ignored `.env` file.
+2. **Flyway Migrations:** All schema changes must be declared via Flyway migrations (`db/migration/V1__...`, `V2__...`, `V3__...`) to maintain consistent database state between Docker and AWS.
+3. **TypeScript Quality:** Avoid using `any` types. Define interfaces or types for all request/response objects.
 
 ---
 
 <div align="center">
 
-**AnLao.vn** — Kết nối gia đình với sự chăm sóc tận tâm nhất 💚
+**AnLao.vn** — Caring for elderly loved ones with modern AI & Cloud solutions 💚
 
 </div>
